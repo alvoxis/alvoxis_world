@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Alvoxis World</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Pixelify+Sans:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ===== Экран запуска ===== -->
+<div id="launcher" class="launcher">
+  <div class="launcher-box">
+    <div class="logo"><span class="logo-a">ALVOXIS</span><span class="logo-b">WORLD</span></div>
+    <p class="subtitle">симулятор живого мира с разумными существами</p>
+
+    <div class="l-section">
+      <h3>Размер мира</h3>
+      <div class="btn-row" data-group="size">
+        <button class="pick" data-v="small">Малый</button>
+        <button class="pick selected" data-v="medium">Средний</button>
+        <button class="pick" data-v="large">Большой</button>
+        <button class="pick" data-v="huge">Огромный</button>
+      </div>
+    </div>
+    <div class="l-section">
+      <h3>Форма суши</h3>
+      <div class="btn-row" data-group="shape">
+        <button class="pick selected" data-v="continent">Континент</button>
+        <button class="pick" data-v="island">Остров</button>
+        <button class="pick" data-v="archipelago">Архипелаг</button>
+        <button class="pick" data-v="lakes">Озёра</button>
+      </div>
+    </div>
+    <div class="l-section">
+      <h3>Кто живёт в мире</h3>
+      <div class="btn-row multi" id="starterRow"></div>
+    </div>
+    <div class="l-section">
+      <h3>Зерно мира (необязательно)</h3>
+      <input id="seedInput" type="text" placeholder="пусто — случайный мир" maxlength="32">
+    </div>
+    <button id="startBtn" class="start-btn">СОЗДАТЬ МИР</button>
+    <button id="loadBtnL" class="ghost-btn">Загрузить сохранение</button>
+  </div>
+</div>
+
+<!-- ===== Игра ===== -->
+<div id="game" class="game hidden">
+  <div class="topbar">
+    <div class="tb-logo"><span class="logo-a">ALVOXIS</span><span class="logo-b">WORLD</span></div>
+    <div class="tb-stats">
+      <span id="tbDate">День 1</span>
+      <span id="tbPop">🐾 0</span>
+      <span id="tbSpecies">🧬 0</span>
+      <span id="tbGen">👪 пок. 0</span>
+    </div>
+    <div class="tb-speed" id="speedRow">
+      <button data-speed="0" title="Пауза (пробел)">⏸</button>
+      <button data-speed="1" class="selected" title="x1">▶</button>
+      <button data-speed="2" title="x2">▶▶</button>
+      <button data-speed="5" title="x5">x5</button>
+      <button data-speed="20" title="Максимум">⏩</button>
+    </div>
+  </div>
+
+  <div class="stage">
+    <canvas id="view"></canvas>
+    <div id="toasts" class="toasts"></div>
+    <div id="inspector" class="inspector hidden"></div>
+    <div class="infobar"><span id="tileInfo">—</span><span id="perfInfo"></span></div>
+  </div>
+
+  <div class="dock">
+    <div class="tabs" id="tabs">
+      <button class="tab active" data-tab="look">🖐 Осмотр</button>
+      <button class="tab" data-tab="terrain">⛰️ Ландшафт</button>
+      <button class="tab" data-tab="life">🐾 Существа</button>
+      <button class="tab" data-tab="powers">⚡ Силы</button>
+      <button class="tab" data-tab="stats">📊 Статистика</button>
+      <button class="tab" data-tab="world">🌍 Мир</button>
+    </div>
+    <div class="panes">
+      <div class="pane active" id="pane-look">
+        <div class="tool-grid">
+          <button class="tool selected" data-tool="hand"><i>🖐</i><span>Рука</span></button>
+          <button class="tool" data-tool="inspect"><i>🔍</i><span>Осмотреть</span></button>
+        </div>
+        <p class="hint">Рукой — двигай карту и нажимай на существ, чтобы увидеть их мысли и мозг.
+          Колесо мыши или два пальца — масштаб. Правая кнопка мыши двигает карту с любым инструментом.</p>
+      </div>
+      <div class="pane" id="pane-terrain">
+        <div class="tool-grid" id="terrainTools"></div>
+        <div class="slider-row"><label>Кисть: <b id="brushVal">3</b></label><input type="range" id="brushSize" min="1" max="15" value="3"></div>
+      </div>
+      <div class="pane" id="pane-life">
+        <div class="tool-grid" id="lifeTools"></div>
+        <div class="slider-row"><label>Сколько за клик: <b id="spawnVal">5</b></label><input type="range" id="spawnCount" min="1" max="30" value="5"></div>
+        <details class="designer">
+          <summary>🧬 Конструктор своего вида</summary>
+          <div class="designer-body">
+            <div class="d-row"><label>Название</label><input id="dName" type="text" maxlength="20" placeholder="Мой вид"></div>
+            <div id="dSliders"></div>
+            <button id="dUse" class="action-btn">Выбрать для заселения</button>
+          </div>
+        </details>
+      </div>
+      <div class="pane" id="pane-powers">
+        <div class="tool-grid" id="powerTools"></div>
+        <div class="slider-row"><label>Радиус: <b id="brushVal2">3</b></label><input type="range" id="brushSize2" min="1" max="15" value="3"></div>
+      </div>
+      <div class="pane" id="pane-stats">
+        <div class="stats-wrap">
+          <div class="stats-left">
+            <canvas id="chart"></canvas>
+            <div class="stat-cards" id="statCards"></div>
+          </div>
+          <div class="stats-right">
+            <div class="list-head">Виды (нажми — найти)</div>
+            <div id="speciesList" class="species-list"></div>
+          </div>
+          <div class="stats-right">
+            <div class="list-head">Летопись мира</div>
+            <div id="eventList" class="event-list"></div>
+          </div>
+        </div>
+      </div>
+      <div class="pane" id="pane-world">
+        <div class="tool-grid wide">
+          <button class="action-btn" id="saveBtn">💾 Сохранить</button>
+          <button class="action-btn" id="loadBtn">📂 Загрузить</button>
+          <button class="action-btn" id="newBtn">🌍 Новый мир</button>
+          <button class="action-btn" id="nightBtn">🌙 Ночь: вкл</button>
+          <button class="action-btn" id="followBtn">🎥 Следить: выкл</button>
+          <button class="action-btn" id="fitBtn">🗺️ Весь мир</button>
+        </div>
+        <p class="hint" id="worldInfo"></p>
+        <p class="hint">У каждого существа своя нейросеть: врождённые веса (гены) + то, чему оно научилось за жизнь.
+          Существа учатся на награде (еда) и боли, запоминают хорошие и опасные места, подражают сытым сородичам,
+          перекликаются звуками. Потомки наследуют только гены — выученное умирает вместе с существом.
+          Когда потомки сильно отличаются от предков, рождается новый вид.</p>
+        <p class="hint">Клавиши: пробел — пауза, 1–5 — скорость, WASD/стрелки — камера, Esc — снять выбор.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/core.js"></script>
+<script src="js/genome.js"></script>
+<script src="js/brain.js"></script>
+<script src="js/memory.js"></script>
+<script src="js/world.js"></script>
+<script src="js/species.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/powers.js"></script>
+<script src="js/render.js"></script>
+<script src="js/save.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
