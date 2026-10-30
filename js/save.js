@@ -10,7 +10,7 @@ AW.Save = {
   },
 
   serialize(sim) {
-    const skip = new Set(['kin', 'oth', 'species', 'inp', 'hid', 'out']);
+    const skip = new Set(['kin', 'oth', 'species', 'inp', 'hid', 'out', 'look', 'lookKey']);
     const creatures = sim.creatures.filter(c => c.alive).map(c => {
       const o = {};
       for (const k in c) if (!skip.has(k)) o[k] = c[k];
@@ -43,13 +43,16 @@ AW.Save = {
     sim.gw = Math.ceil(sim.world.w / sim.cell); sim.gh = Math.ceil(sim.world.h / sim.cell);
     sim.cellStart = new Int32Array(sim.gw * sim.gh + 1);
     sim.species = new Map();
-    for (const s of data.species) sim.species.set(s.id, Object.assign(Object.create(AW.Species.prototype), s));
+    for (const s of data.species) { const sp = Object.assign(Object.create(AW.Species.prototype), s); sp.ref = AW.upgradeGenome(sp.ref); sim.species.set(s.id, sp); }
     for (const k in data.presets) { const sp = sim.species.get(data.presets[k]); if (sp) sim.presetSpecies[k] = sp; }
     sim.creatures = data.creatures.map(o => {
       const c = Object.create(AW.Creature.prototype);
       Object.assign(c, o);
       c.inp = new Float32Array(AW.N_IN); c.hid = new Float32Array(AW.MAX_H); c.out = new Float32Array(AW.N_OUT);
       c.kin = null; c.oth = null;
+      c.genome = AW.upgradeGenome(c.genome);
+      if (c.sex === undefined) c.sex = Math.random() < 0.5 ? 0 : 1;
+      c.express();
       c.species = sim.species.get(o.speciesId) || null;
       delete c.speciesId;
       return c;

@@ -24,6 +24,8 @@ AW.Creature = class {
     this.mateCd = 0; this.atkCd = 0;
     this.callAmp = 0; this.callPitch = 0;
     this.alive = true;
+    this.sex = sim.rng() < 0.5 ? 0 : 1; // 0 — самка, 1 — самец (идея EcoSim)
+    this.pose = 0;
     this.species = null;
     this.parentIds = null;
     this.kin = null; this.oth = null; this.kinD = 0; this.othD = 0;
@@ -38,11 +40,18 @@ AW.Creature = class {
     this.H = get('hidden'); this.C = get('context'); this.lr = get('learn'); this.M = get('memory');
     this.swim = get('swim'); this.cold = get('cold'); this.immunity = get('immunity');
     this.invest = get('invest');
+    // органы тела
+    this.legs = get('legs'); this.legN = [0, 2, 4, 6][this.legs];
+    this.horns = get('horns'); this.armor = get('armor'); this.tail = get('tail'); this.ears = get('ears');
+    this.coop = get('coop');
+    this.landMul = [0.55, 0.9, 1, 1.08][this.legs] * (1 - this.armor * 0.3);
+    this.turnMul = 0.8 + this.tail * 0.4;
     this.maxE = 100 * this.size;
     this.maxAge = Math.round(4200 * get('lifespan') * (0.75 + 0.25 * this.size));
     this.mature = this.maxAge * 0.12;
     this.upkeep = 0.028 * Math.pow(this.size, 0.75) + 0.0025 * this.H + 0.0015 * this.C + 0.004 * this.M +
-      0.0012 * this.sense + 0.005 * this.cold + 0.004 * this.immunity + 0.02 * this.lr + 0.006 * this.speed;
+      0.0012 * this.sense + 0.005 * this.cold + 0.004 * this.immunity + 0.02 * this.lr + 0.006 * this.speed +
+      0.0015 * this.legN + 0.006 * this.horns + 0.008 * this.armor + 0.002 * this.tail + 0.003 * this.ears + 0.003 * this.coop;
   }
 };
 
@@ -93,7 +102,7 @@ AW.Sim = class {
     const t = this.world.t[i], T = AW.T;
     if (t === T.DEEP) return c.swim > 0.5 ? c.swim : 0;
     if (t === T.WATER) return 0.25 + c.swim * 0.9;
-    const m = AW.TERRAIN[t].move;
+    const m = AW.TERRAIN[t].move * c.landMul;
     return c.swim > 0.6 ? m * (1.3 - c.swim * 0.7) : m;
   }
 
@@ -205,7 +214,7 @@ AW.Sim = class {
     inp[I.Water] = i >= 0 ? (AW.TERRAIN[w.t[i]].water || 0) / 2 : 0;
 
     // соседи и звуки
-    const R = c.sense, R2 = R * R, HR = R * 1.6, HR2 = HR * HR, csz = this.cell;
+    const R = c.sense, R2 = R * R, HR = R * (0.8 + c.ears * 1.2), HR2 = HR * HR, csz = this.cell;
     const x0 = Math.max(0, ((c.x - HR) / csz) | 0), x1 = Math.min(this.gw - 1, ((c.x + HR) / csz) | 0);
     const y0 = Math.max(0, ((c.y - HR) / csz) | 0), y1 = Math.min(this.gh - 1, ((c.y + HR) / csz) | 0);
     let kin = null, kd = R2, oth = null, od = R2, crowd = 0, hear = null, hl = 0;
@@ -286,7 +295,7 @@ AW.Sim = class {
 
     // движение
     if (!resting) {
-      c.dir += out[O.Turn] * 0.3;
+      c.dir += out[O.Turn] * 0.3 * c.turnMul;
       const sprint = out[O.Sprint] > 0.5;
       let th = out[O.Thrust];
       if (th < 0) th *= 0.3;
@@ -326,7 +335,7 @@ AW.Sim = class {
     // атака (на чужаков)
     if (c.atkCd > 0) c.atkCd--;
     else if (out[O.Attack] > 0.3 && oth && oth.alive && c.othD < 0.8 + (c.size + oth.size) * 0.3) {
-      const dmg = 15 * Math.pow(c.size, 0.9) * (0.3 + c.diet) * (out[O.Sprint] > 0.5 ? 1.2 : 1);
+      const dmg = 15 * Math.pow(c.size, 0.9) * (0.3 + c.diet) * (1 + c.horns * 0.8) * (out[O.Sprint] > 0.5 ? 1.2 : 1);
       this.hurt(oth, dmg / Math.pow(oth.size, 0.8), 'убит', c);
       c.atkCd = 10;
       cost += 0.2 * c.size;
@@ -352,7 +361,7 @@ AW.Sim = class {
     // размножение
     if (c.mateCd > 0) c.mateCd--;
     else if (out[O.Mate] > 0.3 && c.age > c.mature && c.energy > c.maxE * 0.55) {
-      if (kin && kin.alive && c.kinD < 2.5 && kin.mateCd === 0 && kin.age > kin.mature &&
+      if (kin && kin.alive && kin.sex !== c.sex && c.kinD < 2.5 && kin.mateCd === 0 && kin.age > kin.mature &&
           kin.out[O.Mate] > 0.3 && kin.energy > kin.maxE * 0.45) {
         this.reproduce(c, kin);
         label = 'Размножается';
@@ -393,10 +402,18 @@ AW.Sim = class {
     c.age++;
     if (c.age > c.maxAge) this.kill(c, 'умер от старости');
     c.action = label;
+    // поза для анимации: 0 стоит, 1 идёт, 2 бежит, 3 ест, 4 спит, 5 атакует
+    c.pose = resting ? 4 : label === 'Атакует' ? 5 : label.startsWith('Ест') ? 3 : label === 'Бежит' ? 2 : out[O.Thrust] > 0.1 ? 1 : 0;
+    if (label === 'Атакует') c.attackT = 8; else if (c.attackT > 0) { c.attackT--; c.pose = 5; }
   }
 
   hurt(c, dmg, cause, by, silent) {
     if (!c.alive) return;
+    if (by) {
+      dmg *= 1 - c.armor * 0.5;                                        // панцирь
+      if (c.kin && c.kin.alive && c.kinD < 2.5) dmg *= 1 - c.coop * 0.35; // сородичи рядом
+      if (c.horns > 0.3) by.hp -= c.horns * 2;                         // рога ранят нападающего
+    }
     c.hp -= dmg;
     if (!silent) c.pain += dmg / 20;
     if (c.hp <= 0) {

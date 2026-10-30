@@ -59,6 +59,27 @@ AW.Renderer = class {
     this.cam.y = vh > w.h ? (w.h - vh) / 2 : AW.clamp(this.cam.y, -4, w.h - vh + 4);
   }
 
+  drawDecor(ctx, ox, oy, z, vx0, vy0, vx1, vy1) {
+    const w = this.sim.world, T = AW.T, sp = z / 8, dw = 16 * sp, dh = 20 * sp;
+    const thr = z >= 8 ? 120 : z >= 6 ? 170 : 215; // при отдалении деревьев меньше
+    const x0 = Math.max(0, vx0 | 0), x1 = Math.min(w.w - 1, vx1 | 0), y0 = Math.max(0, vy0 | 0), y1 = Math.min(w.h - 1, vy1 | 0);
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const i = y * w.w + x, t = w.t[i], v = w.vary[i];
+      if (w.fire[i]) continue;
+      let kind = null, vv = '';
+      const lush = w.veg[i] / AW.TERRAIN[t].cap > 0.35 ? 'l' : 'd', tx = w.tox[i] ? 't' : '';
+      if (t === T.FOREST && v > thr - 40) { kind = v % 3 === 0 ? 'pine' : 'tree'; vv = lush + tx + (v % 3); }
+      else if (t === T.GRASS && v > 250 - (thr === 120 ? 10 : 0)) { kind = v % 2 ? 'bush' : 'tree'; vv = lush + tx + (v % 3); }
+      else if (t === T.HILLS && v > thr + 50) { kind = 'pine'; vv = lush + '0'; }
+      else if (t === T.SNOW && v > thr + 60) { kind = 'pine'; vv = 'ls0'; }
+      else if (t === T.MOUNTAIN && v > thr + 40) { kind = 'rock'; vv = '0'; }
+      else if (t === T.SAND && v > 252 && w.veg[i] > 0.05) { kind = 'cactus'; vv = '0'; }
+      if (w.meat[i] > 1.5 && z >= 5) ctx.drawImage(AW.Decor.get('bones', '0'), Math.round(ox + (x + 0.5) * z - dw / 2), Math.round(oy + (y + 0.5) * z - dh * 0.85), dw, dh);
+      if (!kind) continue;
+      ctx.drawImage(AW.Decor.get(kind, vv), Math.round(ox + (x + 0.5) * z - dw / 2), Math.round(oy + (y + 1) * z - dh), dw, dh);
+    }
+  }
+
   paintTerrain() {
     const w = this.sim.world, d = this.img.data, T = AW.T, TR = AW.TERRAIN, n = w.w * w.h, fl = this.frame;
     for (let i = 0; i < n; i++) {
@@ -103,40 +124,49 @@ AW.Renderer = class {
     const ox = -cam.x * z + sx, oy = -cam.y * z + sy;
     ctx.drawImage(this.tc, Math.round(ox), Math.round(oy), sim.world.w * z, sim.world.h * z);
 
-    // существа
+    // декор: деревья, кусты, камни, кости (при достаточном приближении)
     const vx0 = cam.x - 2, vy0 = cam.y - 2, vx1 = cam.x + W / z + 2, vy1 = cam.y + H / z + 2;
-    const tiny = z < 3.5;
-    for (const c of sim.creatures) {
-      if (c.x < vx0 || c.x > vx1 || c.y < vy0 || c.y > vy1) continue;
+    if (z >= 4) this.drawDecor(ctx, ox, oy, z, vx0, vy0, vx1, vy1);
+
+    // существа — полноценные спрайты, сортировка по глубине
+    const vis = this._vis || (this._vis = []);
+    vis.length = 0;
+    for (const c of sim.creatures) if (c.x >= vx0 && c.x <= vx1 && c.y >= vy0 && c.y <= vy1) vis.push(c);
+    vis.sort((a, b) => a.y - b.y);
+    const sp = z / 8, w = sim.world;
+    for (const c of vis) {
       const px = ox + c.x * z, py = oy + c.y * z;
-      const hue = c.genome[AW.G.hue] | 0;
-      if (tiny) {
-        const s = Math.max(2, Math.round(z * 0.9));
-        ctx.fillStyle = `hsl(${hue},75%,${c.disease ? 40 : 58}%)`;
-        ctx.fillRect(Math.round(px - s / 2), Math.round(py - s / 2), s, s);
-        continue;
+      const pose = c.pose || 0, nf = AW.POSE_FRAMES[pose];
+      const fr = nf > 1 ? ((this.frame >> (pose === 2 ? 2 : 3)) + c.id) % nf : 0;
+      const flip = Math.cos(c.dir) < 0;
+      const img = AW.Sprites.get(c, pose, fr, flip);
+      const dw = AW.SPR_W * sp, dh = AW.SPR_H * sp;
+      const dx = Math.round(px - dw / 2), dy = Math.round(py - dh * 0.88);
+      const ti = w.at(c.x, c.y), inWater = ti >= 0 && AW.TERRAIN[w.t[ti]].water;
+      if (inWater && c.swim > 0.55) {
+        // водные существа плывут целиком
+        ctx.globalAlpha = 0.9;
+        ctx.drawImage(img, dx, dy + Math.round(sp), dw, dh);
+        ctx.globalAlpha = 1;
+      } else if (inWater) {
+        // в воде видна только верхняя часть тела
+        const cut = Math.round(AW.SPR_H * 0.7);
+        ctx.drawImage(img, 0, 0, AW.SPR_W, cut, dx, dy, dw, cut * sp);
+        ctx.fillStyle = 'rgba(200,230,255,0.7)';
+        ctx.fillRect(Math.round(px - dw * 0.28), Math.round(dy + cut * sp - Math.max(1, sp)), Math.round(dw * 0.56), Math.max(1, Math.round(sp)));
+      } else {
+        ctx.fillStyle = 'rgba(0,0,0,0.22)';
+        ctx.fillRect(Math.round(px - dw * 0.25), Math.round(py - sp * 2), Math.round(dw * 0.5), Math.max(1, Math.round(sp * 2)));
+        ctx.drawImage(img, dx, dy, dw, dh);
       }
-      const s = Math.max(3, Math.round(z * (0.45 + c.size * 0.3)));
-      const x0 = Math.round(px - s / 2), y0 = Math.round(py - s / 2);
-      ctx.fillStyle = 'rgba(0,0,0,0.75)';
-      ctx.fillRect(x0 - 1, y0 - 1, s + 2, s + 2);
-      ctx.fillStyle = c.disease ? `hsl(${hue},35%,38%)` : `hsl(${hue},70%,${52 + (c.energy / c.maxE) * 12}%)`;
-      ctx.fillRect(x0, y0, s, s);
-      // тень снизу для объёма
-      const p = Math.max(1, Math.round(s / 4));
-      ctx.fillStyle = 'rgba(0,0,0,0.25)';
-      ctx.fillRect(x0, y0 + s - p, s, p);
-      // глаз в сторону взгляда: белый — травоядный, красный — хищник
-      const ex = Math.round(px + Math.cos(c.dir) * s * 0.3 - p / 2), ey = Math.round(py + Math.sin(c.dir) * s * 0.3 - p / 2);
-      ctx.fillStyle = c.diet > 0.6 ? '#ff3030' : c.diet > 0.3 ? '#ffb030' : '#ffffff';
-      ctx.fillRect(ex, ey, p, p);
-      if (c.callAmp > 0 && z >= 6) {
-        ctx.fillStyle = `rgba(255,255,255,${0.4 + c.callAmp * 0.6})`;
-        ctx.fillRect(x0 + s + 1, y0 - p * 2, p, p * 2);
-      }
-      if (c.out[AW.OUT.Attack] > 0.3 && c.atkCd > 6 && z >= 6) {
-        ctx.fillStyle = '#ffdd33';
-        ctx.fillRect(x0 - p, y0 - p, p, p);
+      if (z >= 6) {
+        if (pose === 4 && ((this.frame >> 5) + c.id) % 2) { ctx.fillStyle = '#e8f0ff'; ctx.font = `${Math.round(6 * sp + 6)}px monospace`; ctx.fillText('z', px + dw * 0.2, dy + dh * 0.2); }
+        if (c.callAmp > 0) { ctx.fillStyle = `rgba(255,255,255,${0.5 + c.callAmp * 0.5})`; ctx.fillRect(Math.round(px + dw * 0.3), Math.round(dy + dh * 0.15), Math.max(1, Math.round(sp)), Math.max(2, Math.round(sp * 3))); }
+        if (c.disease) { ctx.fillStyle = '#8bd450'; ctx.fillRect(Math.round(px - dw * 0.1), Math.round(dy), Math.max(2, Math.round(sp * 2)), Math.max(2, Math.round(sp * 2))); }
+        if (c.hp < 50) {
+          ctx.fillStyle = '#300'; ctx.fillRect(Math.round(px - dw * 0.2), dy, Math.round(dw * 0.4), Math.max(1, Math.round(sp)));
+          ctx.fillStyle = '#ff3a3a'; ctx.fillRect(Math.round(px - dw * 0.2), dy, Math.round(dw * 0.4 * Math.max(0, c.hp) / 100), Math.max(1, Math.round(sp)));
+        }
       }
     }
 

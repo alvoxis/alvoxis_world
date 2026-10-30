@@ -109,6 +109,7 @@ AW.applyTool = function (sim, toolId, x, y, brush, fx) {
         AW.mutateGenome(c.genome, sim.rng, 6);
         AW.mutateBrain(c.brain, 0.5, sim.rng);
         const oldM = c.M;
+        c.look = null; c.lookKey = null;
         c.express();
         if (c.M !== oldM) { const m = new Float32Array(Math.max(1, c.M) * 4); m.set(c.mem.subarray(0, Math.min(c.mem.length, m.length))); c.mem = m; }
         n++;

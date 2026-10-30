@@ -70,6 +70,22 @@ AW.Game = class {
     this.$('worldInfo').textContent = `Мир ${sim.world.w}×${sim.world.h}, зерно ${sim.seed}. Лимит существ: ${AW.MAX_POP}.`;
   }
 
+  // Демо: маленький мир с одним существом и его парой
+  startDemo(key) {
+    const P = AW.PRESETS[key];
+    const sim = new AW.Sim({ size: 'small', shape: 'island', seed: 777, starters: {} });
+    const probe = sim.makeFounder(P.g, null, 0, 0);
+    const spot = AW.Lab.landSpot(sim, probe);
+    sim.spawnGroup(key, P.g, P.name, spot.x, spot.y, 1, 0.5);
+    sim.spawnGroup(key, P.g, P.name, spot.x, spot.y, 1, 1.5);
+    const [a, b] = sim.creatures;
+    if (a) { a.sex = 0; a.age = Math.round(a.mature * 1.5); a.energy = a.maxE * 0.9; }
+    if (b) { b.sex = 1; b.age = Math.round(b.mature * 1.5); b.energy = b.maxE * 0.9; }
+    this.begin(sim);
+    if (a) { this.select(a); this.centerOn(a); this.renderer.cam.zoom = 16; this.centerOn(a); this.setFollow(true); }
+    this.toast(`🧪 Демо: ${a ? a.name : ''} и ${b ? b.name : ''} (${P.name}). Смотри мозг и гены в инспекторе справа.`, 'spawn');
+  }
+
   async save() {
     try { await AW.Save.save(this.sim); this.toast('💾 Мир сохранён', 'spawn'); }
     catch (e) { this.toast('Не удалось сохранить: ' + e.message, 'extinct'); }
@@ -284,6 +300,7 @@ AW.Game = class {
       this.ui.pullEvents();
       if (this.selected) this.ui.updateInspector();
       this.ui.updateStats();
+      this.ui.drawLab();
       this.updateTileInfo();
     }
     requestAnimationFrame(t => this.loop(t));

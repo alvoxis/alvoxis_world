@@ -80,6 +80,7 @@
       <button class="tab" data-tab="life">🐾 Существа</button>
       <button class="tab" data-tab="powers">⚡ Силы</button>
       <button class="tab" data-tab="stats">📊 Статистика</button>
+      <button class="tab" data-tab="lab">🧪 Лаборатория</button>
       <button class="tab" data-tab="world">🌍 Мир</button>
     </div>
     <div class="panes">
@@ -127,6 +128,35 @@
           </div>
         </div>
       </div>
+      <div class="pane" id="pane-lab">
+        <div class="lab-wrap">
+          <div class="lab-col">
+            <div class="list-head">ДЕМО: ОДНО СУЩЕСТВО</div>
+            <p class="hint">Новый маленький мир, в нём одно существо и его пара. Можно смотреть мозг, память, гены и как они заводят потомство.</p>
+            <div class="d-row"><label for="labPreset">Вид</label><select id="labPreset"></select></div>
+            <button class="action-btn" id="labDemo">▶ Запустить демо</button>
+          </div>
+          <div class="lab-col">
+            <div class="list-head">СКРЕЩИВАНИЕ</div>
+            <p class="hint">Родитель A — выбранное существо (или случайное), B — ближайший сородич другого пола.</p>
+            <div class="breed-row">
+              <figure><canvas id="brA" width="96" height="72"></canvas><figcaption id="brAn">A</figcaption></figure>
+              <span class="breed-op">+</span>
+              <figure><canvas id="brB" width="96" height="72"></canvas><figcaption id="brBn">B</figcaption></figure>
+              <span class="breed-op">=</span>
+              <figure><canvas id="brC" width="96" height="72"></canvas><figcaption>Потомок</figcaption></figure>
+            </div>
+            <div class="btn-pair"><button class="action-btn" id="labBreed">🧬 Скрестить</button><button class="action-btn" id="labRelease">🌱 Выпустить потомка</button></div>
+            <div id="breedTable" class="breed-table"></div>
+          </div>
+          <div class="lab-col">
+            <div class="list-head">ТЕСТ НАСЛЕДОВАНИЯ</div>
+            <p class="hint">Проверяет на сотнях пар, что потомки наследуют гены, строение тела и мозг родителей, а выученное за жизнь не передаётся.</p>
+            <button class="action-btn" id="labTest">✔ Запустить тест</button>
+            <div id="testResults" class="test-results"></div>
+          </div>
+        </div>
+      </div>
       <div class="pane" id="pane-world">
         <div class="tool-grid wide">
           <button class="action-btn" id="saveBtn">💾 Сохранить</button>
@@ -155,7 +185,9 @@
 <script src="js/species.js"></script>
 <script src="js/sim.js"></script>
 <script src="js/powers.js"></script>
+<script src="js/sprites.js"></script>
 <script src="js/render.js"></script>
+<script src="js/lab.js"></script>
 <script src="js/save.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/main.js"></script>

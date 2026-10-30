@@ -17,6 +17,16 @@ AW.LOCI = [
   { key: 'lifespan', name: 'Долголетие',      min: 0.5,  max: 2 },
   { key: 'invest',   name: 'Забота о потомстве', min: 0.15, max: 0.6 },
   { key: 'hue',      name: 'Окрас',           min: 0,    max: 360, wrap: true },
+  // Строение тела (идея ALIEN: тело собрано из органов, у каждого своя функция и цена)
+  { key: 'legs',     name: 'Ноги (0/2/4/6)',  min: 0,    max: 3, int: true, body: true },
+  { key: 'horns',    name: 'Рога',            min: 0,    max: 1, body: true },
+  { key: 'armor',    name: 'Панцирь',         min: 0,    max: 1, body: true },
+  { key: 'tail',     name: 'Хвост',           min: 0,    max: 1, body: true },
+  { key: 'ears',     name: 'Уши',             min: 0,    max: 1, body: true },
+  { key: 'pattern',  name: 'Узор',            min: 0,    max: 1, body: true },
+  { key: 'hue2',     name: 'Цвет узора',      min: 0,    max: 360, wrap: true, body: true },
+  // Групповая защита (идея EcoSim: cooperative defence)
+  { key: 'coop',     name: 'Групповая защита', min: 0,   max: 1 },
 ];
 AW.NL = AW.LOCI.length;
 AW.G = {};
@@ -29,6 +39,15 @@ AW.genomeFrom = function (obj) {
     g[i] = AW.clamp(v, l.min, l.max);
   });
   return g;
+};
+
+// старые сохранения: дополнить геном недостающими генами
+AW.upgradeGenome = function (g) {
+  if (g.length >= AW.NL) return g;
+  const n = new Float32Array(AW.NL);
+  n.set(g);
+  for (let i = g.length; i < AW.NL; i++) { const l = AW.LOCI[i]; n[i] = l.int ? Math.round((l.min + l.max) / 2) : (l.min + l.max) / 2; }
+  return n;
 };
 
 AW.genomeGet = function (g, key) {

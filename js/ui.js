@@ -8,6 +8,83 @@ AW.UI = class {
     this.buildTools();
     this.buildDesigner();
     this.bindTabs();
+    this.bindLab();
+  }
+
+  // ---------- лаборатория ----------
+  bindLab() {
+    const sel = this.$('labPreset');
+    for (const [k, p] of Object.entries(AW.PRESETS)) { const o = document.createElement('option'); o.value = k; o.textContent = `${p.icon} ${p.name}`; sel.appendChild(o); }
+    sel.value = 'omni';
+    this.$('labDemo').onclick = () => this.g.startDemo(sel.value);
+    this.$('labBreed').onclick = () => this.breed();
+    this.$('labRelease').onclick = () => this.releaseChild();
+    this.$('labTest').onclick = () => {
+      const box = this.$('testResults');
+      box.textContent = 'Идёт проверка…';
+      setTimeout(() => {
+        const res = AW.Lab.runInheritanceTests(), ok = res.filter(t => t.ok).length;
+        box.innerHTML = `<div class="${ok === res.length ? 'ok' : 'bad'}"><b>${ok}/${res.length} проверок пройдено</b></div>` +
+          res.map(t => `<div class="${t.ok ? 'ok' : 'bad'}">${t.ok ? '✓' : '✗'} ${t.name} <small>(${t.detail})</small></div>`).join('');
+      }, 30);
+    };
+  }
+
+  breed() {
+    const sim = this.g.sim;
+    let a = this.g.selected && this.g.selected.alive ? this.g.selected : null;
+    if (!a) {
+      const big = [...sim.species.values()].filter(s => s.count > 1).sort((x, y) => y.count - x.count)[0];
+      const pool = big ? sim.creatures.filter(c => c.species === big) : [];
+      a = pool[(Math.random() * pool.length) | 0];
+    }
+    if (!a) { this.g.toast('В мире нет существ для скрещивания', 'extinct'); return; }
+    let b = null, bd = Infinity;
+    for (const c of sim.creatures) {
+      if (c === a || c.species !== a.species || c.sex === a.sex) continue;
+      const d = (c.x - a.x) ** 2 + (c.y - a.y) ** 2;
+      if (d < bd) { bd = d; b = c; }
+    }
+    if (!b) { this.g.toast(`Для ${a.name} нет пары другого пола`, 'extinct'); return; }
+    const res = AW.Lab.breedExplain(sim, a, b);
+    this.breedRes = { a, b, ...res, look: AW.appearance(res.genome) };
+    this.$('brAn').textContent = `${a.sex ? '♂' : '♀'} ${a.name}`;
+    this.$('brBn').textContent = `${b.sex ? '♂' : '♀'} ${b.name}`;
+    const row = l => {
+      const i = AW.G[l.key], f = v => l.int ? Math.round(v) : l.key === 'diet' ? Math.round(v * 100) + '%' : v.toFixed(2);
+      const o = res.origin[i];
+      return `<tr><td>${l.name}</td><td>${f(a.genome[i])}</td><td>${f(b.genome[i])}</td><td class="${o.includes('мутация') ? 'mut' : ''}">${f(res.genome[i])}</td><td>${o}</td></tr>`;
+    };
+    this.$('breedTable').innerHTML = `<table><tr><th>Ген</th><th>A</th><th>B</th><th>Потомок</th><th>Откуда</th></tr>${AW.LOCI.filter(l => !l.wrap).map(row).join('')}</table>`;
+  }
+
+  releaseChild() {
+    const br = this.breedRes, sim = this.g.sim;
+    if (!br || !br.a.alive) { this.g.toast('Сначала скрести двух живых существ', 'extinct'); return; }
+    const c = new AW.Creature(sim, Float32Array.from(br.genome), Float32Array.from(br.brain), br.a.x + 0.5, br.a.y + 0.5);
+    c.gen = Math.max(br.a.gen, br.b.gen) + 1;
+    c.parentIds = [br.a.id, br.b.id];
+    c.energy = c.maxE * 0.7;
+    c.species = AW.assignSpecies(sim, c, br.a.species);
+    c.species.count++; c.species.total++;
+    br.a.kids++; br.b.kids++;
+    sim.born.push(c);
+    this.g.select(c);
+    this.g.toast(`🌱 ${c.name} выпущен в мир`, 'spawn');
+  }
+
+  drawLab() {
+    if (this.activeTab !== 'lab' || !this.breedRes) return;
+    const br = this.breedRes, f = (this.g.renderer.frame >> 3) % 4;
+    const put = (id, look) => {
+      const cv = this.$(id), ctx = cv.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      ctx.drawImage(AW.Sprites.forLookCached(look, 1, f), 0, 0, 96, 72);
+    };
+    put('brA', br.a.look || AW.appearance(br.a.genome));
+    put('brB', br.b.look || AW.appearance(br.b.genome));
+    put('brC', br.look);
   }
 
   toolButton(id, icon, label, swatch) {
@@ -114,6 +191,7 @@ AW.UI = class {
       <div class="ins-head"><div class="ins-swatch" id="iSw"></div>
         <div><div class="ins-name" id="iName"></div><div class="ins-sub" id="iSub"></div></div>
         <button class="ins-close" id="iClose">✕</button></div>
+      <div class="ins-portrait"><canvas id="iPortrait" width="96" height="72"></canvas><div class="kv" id="iBody"></div></div>
       <div class="ins-thought" id="iThought"></div>
       <div>Энергия</div><div class="bar"><div id="iE" style="background:#ffcc00"></div></div>
       <div>Здоровье</div><div class="bar"><div id="iH" style="background:#00ff88"></div></div>
@@ -168,7 +246,18 @@ AW.UI = class {
     const sim = this.g.sim, sp = c.species, hue = c.genome[AW.G.hue] | 0;
     this.$('iSw').style.background = `hsl(${hue},70%,58%)`;
     this.$('iName').textContent = c.name;
-    this.$('iSub').innerHTML = `${sp ? sp.name : '?'} · ${AW.dietLabel(c.diet)} · поколение ${c.gen}`;
+    this.$('iSub').innerHTML = `${c.sex ? '♂ самец' : '♀ самка'} · ${sp ? sp.name : '?'} · ${AW.dietLabel(c.diet)} · поколение ${c.gen}`;
+    const pc = this.$('iPortrait'), pctx = pc.getContext('2d'), pose = c.alive ? c.pose || 0 : AW.POSE.SLEEP;
+    const nf = AW.POSE_FRAMES[pose], fr = nf > 1 ? (this.g.renderer.frame >> 3) % nf : 0;
+    pctx.imageSmoothingEnabled = false;
+    pctx.clearRect(0, 0, 96, 72);
+    pctx.drawImage(AW.Sprites.get(c, pose, fr, false), 0, 0, 96, 72);
+    const parents = (c.parentIds || []).map(id => { const p = sim.creatures.find(o => o.id === id); return p ? p.name : '†'; });
+    this.$('iBody').innerHTML = [
+      ['Поза', c.alive ? AW.POSE_NAMES[pose] : 'мёртв'], ['Ноги', c.legN], ['Рога', c.horns > 0.15 ? 'есть' : 'нет'],
+      ['Панцирь', c.armor > 0.6 ? 'с шипами' : c.armor > 0.25 ? 'есть' : 'нет'],
+      ['Родители', parents.length ? parents.join(' + ') : 'основатель'],
+    ].map(([k, v]) => `<span>${k}</span><span>${v}</span>`).join('');
     this.$('iThought').textContent = this.thought(c);
     this.$('iE').style.width = (c.energy / c.maxE * 100).toFixed(0) + '%';
     this.$('iH').style.width = Math.max(0, c.hp).toFixed(0) + '%';

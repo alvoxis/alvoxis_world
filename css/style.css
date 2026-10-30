@@ -202,7 +202,32 @@ button { font-family: inherit; color: inherit; }
 .ev { padding: 2px 0; border-bottom: 1px dashed #22224a; }
 .ev i { color: var(--muted); font-style: normal; }
 
+/* ---------- Лаборатория ---------- */
+.lab-wrap { display: grid; grid-template-columns: 1fr 1.6fr 1.2fr; gap: 14px; }
+.lab-col { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.lab-col .hint { margin-top: 0; font-size: 13px; }
+.lab-col select { flex: 1; padding: 4px; font-family: var(--body); font-size: 14px; color: var(--text); background: #0d0d2d; border: 2px solid #4a4a8d; }
+.breed-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.breed-row figure { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.breed-row canvas { width: 96px; height: 72px; background: #3d7a32; border: 2px solid #2a2a5d; image-rendering: pixelated; }
+.breed-row figcaption { font-size: 12px; color: var(--muted); max-width: 96px; text-align: center; }
+.breed-op { font-family: var(--pix); color: var(--yellow); font-size: 12px; }
+.btn-pair { display: flex; gap: 6px; flex-wrap: wrap; }
+.breed-table { font-size: 12px; max-height: 120px; overflow-y: auto; }
+.breed-table table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.breed-table td, .breed-table th { padding: 1px 4px; text-align: right; border-bottom: 1px dashed #22224a; }
+.breed-table td:first-child, .breed-table th:first-child { text-align: left; color: var(--muted); }
+.breed-table .mut { color: #ff9a3d; }
+.test-results { font-size: 13px; max-height: 130px; overflow-y: auto; }
+.test-results div { padding: 1px 0; }
+.test-results .ok { color: #3dff8c; }
+.test-results .bad { color: #ff5a5a; }
+.ins-portrait { display: flex; align-items: center; gap: 10px; margin: 4px 0; }
+.ins-portrait canvas { width: 96px; height: 72px; background: #3d7a32; border: 2px solid #2a2a5d; image-rendering: pixelated; flex-shrink: 0; }
+.ins-portrait .kv { flex: 1; margin: 0; }
+
 @media (max-width: 760px) {
+  .lab-wrap { grid-template-columns: 1fr; }
   .tb-logo { display: none; }
   .topbar { gap: 6px; padding: 4px 6px; }
   .tb-stats { gap: 8px; font-size: 13px; }
