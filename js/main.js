@@ -78,10 +78,15 @@ AW.Game = class {
   async load() {
     try {
       const sim = await AW.Save.load();
-      if (!sim) { alert('Сохранений пока нет'); return; }
+      if (!sim) { this.notice('Сохранений пока нет'); return; }
       this.begin(sim);
       this.toast('📂 Мир загружен', 'spawn');
-    } catch (e) { alert('Не удалось загрузить: ' + e.message); }
+    } catch (e) { this.notice('Не удалось загрузить: ' + e.message); }
+  }
+
+  notice(text) {
+    if (this.sim && !this.$('game').classList.contains('hidden')) this.toast(text, 'extinct');
+    else { const b = this.$('loadBtnL'); b.textContent = text; setTimeout(() => { b.textContent = 'Загрузить сохранение'; }, 3000); }
   }
 
   // ---------- кнопки ----------
@@ -94,7 +99,17 @@ AW.Game = class {
     this.$('spawnCount').oninput = e => { this.spawnCount = +e.target.value; this.$('spawnVal').textContent = e.target.value; };
     this.$('saveBtn').onclick = () => this.save();
     this.$('loadBtn').onclick = () => this.load();
-    this.$('newBtn').onclick = () => { if (confirm('Создать новый мир? Текущий будет потерян, если не сохранён.')) { this.$('game').classList.add('hidden'); this.$('launcher').classList.remove('hidden'); } };
+    // подтверждение прямо на кнопке (диалоги confirm() работают не везде)
+    this.$('newBtn').onclick = () => {
+      const b = this.$('newBtn');
+      if (!b.dataset.armed) {
+        b.dataset.armed = '1'; b.textContent = '⚠️ Точно? Ещё раз';
+        setTimeout(() => { delete b.dataset.armed; b.textContent = '🌍 Новый мир'; }, 3000);
+        return;
+      }
+      delete b.dataset.armed; b.textContent = '🌍 Новый мир';
+      this.$('game').classList.add('hidden'); this.$('launcher').classList.remove('hidden');
+    };
     this.$('nightBtn').onclick = () => { this.renderer.showNight = !this.renderer.showNight; this.$('nightBtn').textContent = '🌙 Ночь: ' + (this.renderer.showNight ? 'вкл' : 'выкл'); };
     this.$('followBtn').onclick = () => this.setFollow(!this.follow);
     this.$('fitBtn').onclick = () => this.renderer.fitCamera();
@@ -287,4 +302,5 @@ AW.Game = class {
   }
 };
 
-window.addEventListener('DOMContentLoaded', () => { AW.game = new AW.Game(); });
+if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', () => { AW.game = new AW.Game(); });
+else AW.game = new AW.Game();
